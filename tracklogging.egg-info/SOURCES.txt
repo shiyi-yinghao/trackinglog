@@ -1,0 +1,8 @@
+README.md
+setup.py
+log_manager/__init__.py
+log_manager/log_manager.py
+tracklogging.egg-info/PKG-INFO
+tracklogging.egg-info/SOURCES.txt
+tracklogging.egg-info/dependency_links.txt
+tracklogging.egg-info/top_level.txt
