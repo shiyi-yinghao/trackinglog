@@ -1,5 +1,5 @@
 Metadata-Version: 2.1
-Name: tracklogging
+Name: trackinglog
 Version: 0.1.0
 Summary: A logging package for tracing function calls with error handling and email notification
 Author: Yinghao Li
@@ -7,14 +7,14 @@ Author-email: shiyi.yinghao@gmail.com
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 
-# TraceLog
+# TrackLogging
 
-TraceLog is a logging package for tracing function calls with error handling and email notification.
+TrackLogging is a logging package for tracing function calls with error handling and email notification.
 
 ## Installation
 
-You can install TraceLog using pip:
+You can install TrackingLog using pip:
 
 ```bash
-pip install tracelog
+pip install trackinglog
 

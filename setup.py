@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='tracklogging',
+    name='trackinglog',
     version='0.1.0',
     description='A logging package for tracing function calls with error handling and email notification',
     long_description=open('README.md').read(),
