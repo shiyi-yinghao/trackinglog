@@ -6,7 +6,7 @@ class LogConfig:
 
     def __init__(self, root_log_path='logs', cache_log_path=None):
         self._root_log_path = root_log_path
-        self._cache_log_path = cache_log_path
+        self._cache_log_path = cache_log_path if cache_log_path is not None else pjoin(root_log_path, "cache")
         
     @property
     def root_log_path(self):

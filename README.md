@@ -13,12 +13,13 @@ pip install trackinglog
 
 ## version History
 0.1.0 Package Draft created
-0.1.1 Decorator get_log and directly object getter get_logger creates.
----
+0.1.1 Decorator get_log and directly object creator get_logger created. Added setup check decorator. Added p-functions(print and log).
+0.1.2 Added error handling. Added verbose option for decorator. Added called function name.
+
+## Feature in developing
 Add error handling
-Reset setup check to class decorator
-Add p-functions
 Add print to log functions
 Add public and private log
 Add email notification
+Add performance tracking
 Add Kafka message notification
