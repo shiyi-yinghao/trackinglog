@@ -169,15 +169,15 @@ class LogManager:
             filtered_lines = [line for i, line in enumerate(lines) if "log_manager" not in line \
                     and (i == 0 or "log_manager" not in lines[i - 1])]
             return '\n'.join(filtered_lines)
-
+        
         def manage_profiling(func, args, kwargs, profiling_type=None):
             if profiling_type!=None:
-                start_time = time.time()
                 if profiling_type == "line":
                     profiler = LineProfiler()
                     profiler.add_function(func)
                     profiler.enable()
                 elif profiling_type in ["function", "func"]:
+                    start_time = time.time()
                     process = psutil.Process()
                     cpu_before = process.cpu_percent(interval=None)
                     memory_before = process.memory_info().rss
@@ -187,20 +187,22 @@ class LogManager:
                 
                 if profiling_type == "line":
                     profiler.disable()
-                    profiling_results = io.StringIO()
-                    with redirect_stdout(profiling_results):
+                    profiling_info = io.StringIO()
+                    with redirect_stdout(profiling_info):
                         profiler.print_stats()
-                    profiling_results = profiling_results.getvalue()
-                    logger.info(profiling_results)
+                    profiling_info = profiling_info.getvalue()
+                    # profiling_results = profiling_info.splitlines()                  
+                    # logger.info("\n"+"\n".join(profiling_results[6:]), _log_system_msg="LOG_MANAGER")
+                    logger.info("LineProfiler Stats:\n"+profiling_info, _log_system_msg="LOG_MANAGER")
 
                 elif profiling_type in ["function", "func"]:
                     cpu_after = process.cpu_percent(interval=None)
                     memory_after = process.memory_info().rss
-                    logger.info(f"Resource usage: CPU {cpu_after - cpu_before}%, Memory {((memory_after - memory_before) / (1024 * 1024)):.2f} MB")
-                
-                end_time = time.time()
-                time_taken = end_time - start_time                    
-                logger.info(f"Function {func.__name__} took {time_taken//3600:.0f} hr {time_taken//60:.0f} min {time_taken % 60:.2f} sec")
+                    end_time = time.time()
+                    time_taken = end_time - start_time     
+                    logger.info(f"Function ** {func.__name__} ** took {time_taken//3600:.0f} hr {time_taken//60:.0f} min {time_taken % 60:.2f} sec", _log_system_msg="LOG_MANAGER")
+                    logger.info(f"Resource usage: CPU {cpu_after - cpu_before}%, Memory {((memory_after - memory_before) / (1024 * 1024)):.2f} MB", _log_system_msg="LOG_MANAGER")
+                                   
             else:
                 result = func(*args, **kwargs)
             return result
@@ -212,6 +214,8 @@ class LogManager:
         @decorator.register
         def _(cls: type):  # Class decorator
             original_init = cls.__init__
+
+            @wraps(cls.__init__)
             def wrapped_init(self, *args, **kwargs):
                 original_init(self, *args, **kwargs)
                 self.log = logger
@@ -224,11 +228,11 @@ class LogManager:
                 @wraps(func)
                 def wrapper(*args, **kwargs):
                     if verbose:
-                        logger.debug(f"Calling {cls.__name__}.{func.__name__} called", _log_system_msg="LOG_MANAGER")
+                        logger.debug(f"Calling ** {cls.__name__}.{func.__name__} ** called", _log_system_msg="LOG_MANAGER")
                     try:
                         _result = manage_profiling(func, args, kwargs, profiling_type=enable_profiling)
                         if verbose:
-                            logger.debug(f"Function {cls.__name__}.{func.__name__} returned", _log_system_msg="LOG_MANAGER")
+                            logger.debug(f"** {cls.__name__}.{func.__name__} ** returned", _log_system_msg="LOG_MANAGER")
                         return _result
                     except Exception as e:
                         logger.error(f"Uncatched Error: {e}", _log_system_msg="LOG_MANAGER")
@@ -247,13 +251,13 @@ class LogManager:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 if verbose:
-                    logger.debug(f'Function {func.__name__} called', _log_system_msg="LOG_MANAGER")
+                    logger.debug(f'Function ** {func.__name__} ** called', _log_system_msg="LOG_MANAGER")
                 try:
                     kwargs.pop('log', None)
                     kwargs['log'] = logger
                     _result = manage_profiling(func, args, kwargs, profiling_type=enable_profiling)
                     if verbose:
-                        logger.debug(f'Function {func.__name__} ended.', _log_system_msg="LOG_MANAGER")
+                        logger.debug(f'Function ** {func.__name__} ** ended.', _log_system_msg="LOG_MANAGER")
                     return _result
                 except Exception as e:
                     logger.error(f"Uncatched Error: {e}", _log_system_msg="LOG_MANAGER")
