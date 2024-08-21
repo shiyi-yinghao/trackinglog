@@ -19,6 +19,7 @@ pip install trackinglog
 
 0.1.2 Added error handling. Added verbose option for decorator. Added called function name.
 
+0.1.3 Added profiler for both function level and line level. Updated error handling logic: reset verbose to False, but it will now raise error instead. Added class name to log. Added dependency pakages.
 ## Feature in developing
 
 Add error handling
@@ -32,3 +33,5 @@ Add email notification
 Add performance tracking
 
 Add Kafka message notification
+
+Add cache log cleaner
