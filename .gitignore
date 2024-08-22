@@ -16,8 +16,10 @@
 # Node package directories
 node_modules/
 
-# Java build directories
+# Build directories
 target/
+build/lib/
+*.egg-info/
 
 # Logs and databases #
 ######################
