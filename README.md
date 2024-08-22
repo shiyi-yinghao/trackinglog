@@ -10,6 +10,10 @@ You can install TrackingLog using pip:
 pip install trackinglog
 
 ```
+
+## Github URL
+https://github.com/shiyi-yinghao/trackinglog
+
 ## PyPi URL
 https://pypi.org/project/trackinglog/
 
@@ -25,6 +29,8 @@ https://pypi.org/project/trackinglog/
 
 0.1.4 Formatted the logging message with indentation. Add print to log feature. Refactor the get_log function.
 
+0.1.5 AddED cache log cleaner.
+
 ## Feature in developing
 
 Add public and private log
@@ -33,4 +39,45 @@ Add email notification
 
 Add Kafka message notification
 
-Add cache log cleaner
+
+## Uaage for function:
+
+```python
+import logging
+import trackinglog
+import inspect
+
+# Setup the LogManager with root logging path
+trackinglog.logger.setup(root_log_path='./logs')
+
+@trackinglog.logger.get_log('my_logger', verbose=1, enable_profiling="line")
+def my_function(log=None):  # Notice how the log parameter is expected
+    log.info("This function does something important.")
+    print("Function is executing...")
+    assert False, "This function is broken!"
+    
+my_function()  # Running the function will log start and end, using the specific logger
+
+```
+
+## Usage for class:
+```python
+@trackinglog.logger.get_log('my_logger_cls', verbose=1, enable_profiling="line", print2log=True)
+class testclass:
+    def __init__(self, a: int):
+        self.a=a
+    def p(self):
+        self.log.info("class log")
+        assert False , "This function is broken!"
+
+    def count(self, n: int):
+        for i in range(n):
+            print(i)
+    
+
+t=testclass(2.2)
+t.p()
+t.count(3)
+
+```
+
