@@ -191,8 +191,6 @@ class LogManager:
                     with redirect_stdout(profiling_info):
                         profiler.print_stats()
                     profiling_info = profiling_info.getvalue()
-                    # profiling_results = profiling_info.splitlines()                  
-                    # logger.info("\n"+"\n".join(profiling_results[6:]), _log_system_msg="LOG_MANAGER")
                     logger.info("LineProfiler Stats:\n"+profiling_info, _log_system_msg="LOG_MANAGER")
 
                 elif profiling_type in ["function", "func"]:
@@ -223,27 +221,62 @@ class LogManager:
             update_wrapper(wrapped_init, original_init)
             cls.__init__ = wrapped_init
 
-            def class_attr_wrapper(func):
-                """Decorator to log method calls."""
+
+            def attribute_profile_decorator(func, profiling_type):
+                """Decorator that adds log method calls and adds profiling to functions."""
                 @wraps(func)
                 def wrapper(*args, **kwargs):
                     if verbose:
                         logger.debug(f"Calling ** {cls.__name__}.{func.__name__} ** called", _log_system_msg="LOG_MANAGER")
+
+                    # Profiling code
+                    if profiling_type == "line":
+                        profiler = LineProfiler()
+                        profiler.add_function(func)
+                        profiler.enable()
+                    elif profiling_type in ["function", "func"]:
+                        start_time = time.time()
+                        process = psutil.Process()
+                        cpu_before = process.cpu_percent(interval=None)
+                        memory_before = process.memory_info().rss
+                    
                     try:
                         _result = manage_profiling(func, args, kwargs, profiling_type=enable_profiling)
                         if verbose:
                             logger.debug(f"** {cls.__name__}.{func.__name__} ** returned", _log_system_msg="LOG_MANAGER")
-                        return _result
                     except Exception as e:
                         logger.error(f"Uncatched Error: {e}", _log_system_msg="LOG_MANAGER")
                         logger.error(trace_error_msg(), _log_system_msg="LOG_MANAGER")
+                        profiler.disable()
+                        del profiler
                         raise
-
+                        
+                    if profiling_type == "line":
+                        profiler.disable()
+                        profiling_info = io.StringIO()
+                        profiler.print_stats(stream=profiling_info)
+                        profiling_info = profiling_info.getvalue()
+                        logger.info("LineProfiler Stats:\n"+profiling_info, _log_system_msg="LOG_MANAGER")
+                    elif profiling_type in ["function", "func"]:
+                        cpu_after = process.cpu_percent(interval=None)
+                        memory_after = process.memory_info().rss
+                        end_time = time.time()
+                        time_taken = end_time - start_time
+                        logger.info(f"** {cls.__name__}.{func.__name__} ** took {time_taken//3600:.0f} hr {time_taken//60:.0f} min {time_taken % 60:.2f} sec", _log_system_msg="LOG_MANAGER")
+                        logger.info(f"Resource usage: CPU {cpu_after - cpu_before}%, Memory {((memory_after - memory_before) / (1024 * 1024)):.2f} MB", _log_system_msg="LOG_MANAGER")
+                        
+                    return _result
                 return wrapper
-            
-            for attr_name, attr_value in cls.__dict__.items():
-                if callable(attr_value):
-                    setattr(cls, attr_name, class_attr_wrapper(attr_value))
+
+            def profile_all_methods(cls, profiling_type):
+                """Class decorator that applies the `attr_profiler_decorator` decorator to all callable methods of a class."""
+                for attr_name in dir(cls):
+                    attr = getattr(cls, attr_name)
+                    if callable(attr) and not attr_name.startswith("__"):
+                        setattr(cls, attr_name, attribute_profile_decorator(attr, profiling_type))
+
+            profile_all_methods(cls, enable_profiling)
+
             return cls
 
         @decorator.register(types.FunctionType)
