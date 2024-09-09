@@ -14,7 +14,8 @@ from typing import Optional, Union, Any, Type, Callable, Tuple, Dict
 from line_profiler import LineProfiler
 from functools import wraps, update_wrapper, singledispatch
 from contextlib import redirect_stdout
-from .parameter_config import LogConfig
+from ..parameter_config import ParameterConfig
+from ..email_manager import EmailAgent
 
 class LogManager:
     """
@@ -26,41 +27,16 @@ class LogManager:
         """Create a new LogManager instance or return the existing one."""
         if not cls._instance:
             cls._instance = super(LogManager, cls).__new__(cls)
-            cls._instance.config = LogConfig()
+            cls._instance.config = ParameterConfig()
         return cls._instance
         
     def __init__(self) -> None:
         """Initialize the LogManager with an empty logger dictionary."""
         self.logger_dict={}
 
-    def setup(self, root_log_path: Optional[str] = None, cache_log_limit: Optional[int] = None, cache_log_days: Optional[int] = 7) -> None:
-        """
-        Setup the root logging path and initialize cache logging configuration.
-        Parameters:
-            root_log_path (str): The root path where log files will be stored.
-            cache_log_limit (int): The limit on the number of cache log files.
-            cache_log_days (int): The number of days to keep cache log files.
-        """
-        assert self.check_root_log_path(root_log_path), f"Invalid Root Log Path Given: {root_log_path}"
-        self.config.root_log_path = root_log_path
-        self.create_cache_log(cache_log_limit, cache_log_days)
-        
-    def check_root_log_path(self, root_log_path: str) -> bool:
-        """
-        Check and create the root log path if necessary.
-        Parameters:
-            root_log_path (str): The path to validate and create if it does not exist.
-        Returns:
-            bool: True if the path is valid and accessible, False otherwise.
-        """
-        if not root_log_path:
-            return False
-        try:
-            os.makedirs(self.config.root_log_path, exist_ok=True)
-        except Exception as e:
-            print("Error during creating the folder.",e)
-            return False
-        return True
+    def setup(self, *args, **kwargs):
+        """Delegate the setup to the config object."""
+        self.config.setup(*args, **kwargs)       
         
     def setup_check(func: Callable) -> Callable:
         """
@@ -71,7 +47,7 @@ class LogManager:
             Callable: The wrapped function.
         """
         def decorator(self, *args, **kwargs):
-            if not hasattr(self, 'config') or not self.config.root_log_path:
+            if not hasattr(self, 'config') or not self.config.log_config.root_log_path:
                 raise ValueError("Root log path must be set before using loggers.")
             return func(self, *args, **kwargs)
         return decorator
@@ -116,7 +92,7 @@ class LogManager:
             cache_log_limit (int): Maximum number of log files to retain.
             cache_log_days (int): Maximum age of log files to retain (in days).
         """
-        cache_log_dir = self.config.cache_log_path
+        cache_log_dir = self.config.log_config.cache_log_path
         
         # Ensure the log directory exists
         if not os.path.exists(cache_log_dir):
@@ -149,7 +125,7 @@ class LogManager:
             cache_log_days (int): Maximum age of cache log files to retain (in days).
         """
         self.cache_log_cleaner(cache_log_limit, cache_log_days)
-        self.create_logger("__cache", folderpath=self.config.cache_log_path)
+        self.create_logger("__cache", folderpath=self.config.log_config.cache_log_path)
         
     @setup_check
     def create_logger(self, logname: str, filename: Optional[str] = None, folderpath: Optional[str] = None, log_level: int = logging.DEBUG, timestamp: bool = True, formart_align: bool = True) -> None:
@@ -166,7 +142,7 @@ class LogManager:
             None: Logger is configured and stored in the logger dictionary.
         """
         if not folderpath:
-            folderpath = self.config.root_log_path
+            folderpath = self.config.log_config.root_log_path
         if not filename:
             filename = logname
         else:

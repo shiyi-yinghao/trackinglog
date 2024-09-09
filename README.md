@@ -29,18 +29,20 @@ https://pypi.org/project/trackinglog/
 
 0.1.4 Formatted the logging message with indentation. Add print to log feature. Refactor the get_log function.
 
-0.1.5 AddED cache log cleaner.
+0.1.5 Added cache log cleaner.
+
+0.1.6 Updated Log config to Parameter config. Added inline log usage.
 
 ## Feature in developing
 
 Add public and private log
 
-Add email notification
+Add Added email notification. 
 
 Add Kafka message notification
 
 
-## Uaage for function:
+## Uaage for function and quick settings:
 
 ```python
 import logging
@@ -48,27 +50,35 @@ import trackinglog
 import inspect
 
 # Setup the LogManager with root logging path
-trackinglog.logger.setup(root_log_path='./logs')
+trackinglog.logger.setup(root_task_path='./logs')
 
 @trackinglog.logger.get_log('my_logger', verbose=1, enable_profiling="line")
 def my_function(log=None):  # Notice how the log parameter is expected
     log.info("This function does something important.")
     print("Function is executing...")
-    assert False, "This function is broken!"
+    # assert False, "This function is broken!"
     
 my_function()  # Running the function will log start and end, using the specific logger
 
 ```
 
-## Usage for class:
+## Usage for class and comprehensive settings:
 ```python
+import logging
+import trackinglog
+import inspect
+
+trackinglog.logger.setup(root_task_path='./logs', log_config={'root_log_path':"./logs", '_cache_log_path':"./logs/cache", 'cache_log_num_limit':10, '_cache_log_day_limit':7},
+                                                    email_credential={'username':"PLACEHOLDER", 'password':"PLACEHOLDER",  'root_emails_folder':"./logs/emails"},
+                                                    lock_config={"lock_folder_path":"./logs/locks"})
+
 @trackinglog.logger.get_log('my_logger_cls', verbose=1, enable_profiling="line", print2log=True)
 class testclass:
     def __init__(self, a: int):
         self.a=a
     def p(self):
         self.log.info("class log")
-        assert False , "This function is broken!"
+        # assert False , "This function is broken!"
 
     def count(self, n: int):
         for i in range(n):
@@ -78,6 +88,21 @@ class testclass:
 t=testclass(2.2)
 t.p()
 t.count(3)
-
 ```
 
+## Usage inside a function:
+```python
+trackinglog.logger.setup(root_task_path='./logs')
+
+def my_function():
+    log=trackinglog.logger.get_logger('my_logger_func')
+    log.info("This function does something important.")
+    print("Function is executed")
+
+my_function() 
+```
+
+## Configuration and Parameters:
+
+trackinglog.logger.setup(root_log_path='./logs')
+@trackinglog.logger.get_log('my_logger_cls', verbose=1, enable_profiling="function", print2log=True)
