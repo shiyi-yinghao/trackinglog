@@ -15,6 +15,7 @@ class TaskFolderStruct:
     def __init__(self, task_folder_path):
         self._paths = {}  # Store paths in a private dictionary
         folder_structure = {
+            "root": "",
             "temp": "tmp",
             "cache": "tmp/cache",
             "var": "var",
@@ -26,11 +27,18 @@ class TaskFolderStruct:
             fd_path = os.path.abspath(pjoin(task_folder_path, relpath))
             os.makedirs(fd_path, exist_ok=True)
             self._paths[attr] = fd_path
+        
+        self.__config_tkn_path=pjoin(self._paths["__config"], ".trackinglog.tkn")
 
-        with open(pjoin(self._paths["__config"], ".trackinglog.tkn"), "w") as f:
-            json.dump({"sys_status": "INIT"}, f)
+        if not os.path.exists(self.__config_tkn_path):
+            with open(self.__config_tkn_path, "w") as f:
+                json.dump({"sys_status": "INIT"}, f)
 
     # Property methods to provide read-only access
+    @property
+    def root(self):
+        return self._paths["root"]
+    
     @property
     def temp(self):
         return self._paths["temp"]
@@ -48,27 +56,41 @@ class TaskFolderStruct:
         return self._paths["result"]
     
     def finish(self, params: Optional[Any] = None):
-        with open(pjoin(self._paths["__config"], ".trackinglog.tkn"), "w") as f:
+        with open(self.__config_tkn_path, "w") as f:
             json.dump({
                         "sys_status": "FINISH",
                         "user_config":params
                        }, f)
             
     def inprogress(self, params: Optional[Any] = None):
-        with open(pjoin(self._paths["__config"], ".trackinglog.tkn"), "w") as f:
+        with open(self.__config_tkn_path, "w") as f:
             json.dump({
                         "sys_status": "INPROGRESS",
                         "user_config": params
                        }, f)
     
+    def fail(self, params: Optional[Any] = None):
+        with open(self.__config_tkn_path, "w") as f:
+            json.dump({
+                        "sys_status": "FAIL",
+                        "user_config": params
+                       }, f)
     @property
     def status(self):
-        with open(pjoin(self._paths["__config"], ".trackinglog.tkn"), "r") as f:
+        with open(self.__config_tkn_path, "r") as f:
             status_dic = json.load(f)
-        return status_dic["sys_status"], status_dic.get("user_config", {})
+        return status_dic["sys_status"]
+    
+    @property
+    def config(self):
+        with open(self.__config_tkn_path, "r") as f:
+            status_dic = json.load(f)
+        return status_dic.get("user_config", {})
             
     def __repr__(self) -> str:
-        return f"You can access sub-folder paths through ['."+ "']; ['.".join(self._paths.keys()) + "']"
+        return f"You can access sub-folder paths through ['."+ "']; ['.".join(self._paths.keys()) + "']" + \
+                "\nYou can check the task status by .status and user config by .config" + \
+                "\nYou can set task status and user config by .finish(config); .inprogress(config); .fail(config);"
 
 
 

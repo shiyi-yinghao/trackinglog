@@ -41,6 +41,9 @@ https://pypi.org/project/trackinglog/
 
 0.1.8.3 Enhanced task manager with new task param, introduced finish token.
 
+0.1.8.4 Enhanced task manager with finish, inprogress, fail status; Add root folder path; Bug fix.
+
+
 ## Feature in developing
 
 Add public and private log
