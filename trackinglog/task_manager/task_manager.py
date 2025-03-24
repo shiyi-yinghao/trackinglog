@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import shutil
 from os.path import join as pjoin
@@ -125,7 +126,6 @@ class TaskMgtAgent:
 
     def _check_task_status(self, task_folder):
         tkn_path=pjoin(task_folder, ".__config/.trackinglog.tkn")
-        print(tkn_path)
         try:
             with open(tkn_path, "r") as f:
                 status_dic=json.load(f)
@@ -141,8 +141,10 @@ class TaskMgtAgent:
         
         # Get all folders in the task directory
         folders = [f for f in os.listdir(self._task_folder_path) if os.path.isdir(os.path.join(self._task_folder_path, f))]
-        assert not resume_task or resume_task in folders, f"Can not find task {folders} in history"
-        assert not (new_task in folders), f"Task {new_task} already exists! Please choose a new task timestamp"
+        if new_task == False:
+            assert resume_task in folders or resume_task.startswith("LATEST"), f"Can not find task {resume_task} in history"
+        if new_task == True:
+            assert resume_task not in folders and not resume_task.startswith("LATEST"), f"Task {resume_task} already exists"
 
         # Parse timestamps from folder names and filter valid folders
         valid_folders = []
@@ -158,19 +160,19 @@ class TaskMgtAgent:
         
         # Handle special resume request
         if resume_task == "LATEST":
-            resume_task = valid_folders[0]
-        elif resume_task == "LATEST_COMPLETE":
-            for task_info in valid_folders:
-                if task_info[4].sys_status=="FINISH":
-                    resume_task = task_info[0]
-                    break
-            assert resume_task != "LATEST_COMPLETE", "Can no find and completed task"
-        elif resume_task == "LATEST_STARTED":
-            for task_info in valid_folders:
-                if task_info[4].sys_status!="INIT" and task_info[4].sys_status!="SYS_ERROR":
-                    resume_task = task_info[0]
-                    break
-            assert resume_task != "LATEST_STARTED", "Can no find and started task"
+            resume_task = valid_folders[0][1]
+            print(f"Resumed task {resume_task}")
+        else:
+            match = re.match(r'^LATEST_([A-Z][a-zA-Z]*)$', resume_task)
+            if match:
+                _selected_status = match.group(1)
+                assert _selected_status in ["INIT", "FINISH", "INPROGRESS", "FAIL"], f"status {_selected_status} is not supported"
+                for task_info in valid_folders:
+                    if task_info[3].sys_status==_selected_status:
+                        resume_task = task_info[1]
+                        break
+                assert not resume_task.startswith("LATEST"), f"Can no find any task with status {_selected_status}"
+                print(f"Resumed task {resume_task}")
 
         # Step 1: **Keep only the latest `task_num_limit` folders, delete the rest**
         if self._task_num_limit is not None:
@@ -197,14 +199,25 @@ class TaskMgtAgent:
             except ValueError:
                 print(f"Invalid expiration date format: {self._task_expiration_date}")
 
-        if resume_task:
-            return resume_task  # Resume existing task
-        else:
-            # Create a new task folder with the current timestamp
-            new_task_name = new_task if new_task is not None else datetime.now().strftime(self._task_folder_format)
-            os.makedirs(pjoin(self._task_folder_path, new_task_name), exist_ok=True)
-            print(f"Created new task folder: {new_task_name}")
-            return new_task_name  # Return new task folder name
+        # Handle new task request
+        if resume_task == False:
+            resume_task = datetime.now().strftime(self._task_folder_format)
+
+        _root_task_fd_path = pjoin(self._task_folder_path, resume_task)
+        if not os.path.exists(_root_task_fd_path):
+            print(f"Created new task folder: {_root_task_fd_path}")
+        os.makedirs(_root_task_fd_path, exist_ok=True)
+
+        return resume_task
+    
+        # if resume_task:
+        #     return resume_task  # Resume existing task
+        # else:
+        #     # Create a new task folder with the current timestamp
+        #     new_task_name = new_task if new_task is not None else datetime.now().strftime(self._task_folder_format)
+        #     os.makedirs(pjoin(self._task_folder_path, new_task_name), exist_ok=True)
+        #     print(f"Created new task folder: {new_task_name}")
+        #     return new_task_name  # Return new task folder name
 
     def _extract_date_from_folder(self, folder_name: str) -> Optional[datetime]:
         """Extracts the date from folder name using the task_folder_format."""
@@ -215,7 +228,7 @@ class TaskMgtAgent:
             print(f"Invalid expiration date format: {e}")
             return None
         
-    def setup(self, task_folder_path: str, task_expiration_date: Optional[str], task_num_limit: Optional[int], task_folder_format: str, resume_task: Union[bool, str], new_task: Optional[str]) -> None:
+    def setup(self, task_folder_path: str, task_expiration_date: Optional[str], task_num_limit: Optional[int], task_folder_format: str, resume_task: Union[bool, str], new_task: Optional[bool]) -> None:
         """Setup the task configuration."""
         config_path = os.path.join(task_folder_path, "__task_config.json")
         if os.path.exists(config_path):
@@ -229,7 +242,8 @@ class TaskMgtAgent:
             if old_config.get("task_num_limit", task_num_limit)!=task_num_limit:
                 print(f"Warning: Reset task_num_limit from {old_config.get('task_num_limit')} to {task_num_limit}")
 
-        assert new_task is None or new_task in ["LATEST"] or bool(datetime.strptime(new_task, task_folder_format) or None), f"Given new_task must follow timestamp format {task_folder_format}"
+        assert isinstance(new_task, bool) or new_task is None, f"new_task must be True/False/None"
+        assert resume_task != False or new_task != False, "'resume_task' and 'new_task' can not both be False"
 
         self._task_folder_path = task_folder_path
         self._task_expiration_date = task_expiration_date
