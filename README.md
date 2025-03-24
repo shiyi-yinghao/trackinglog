@@ -43,7 +43,7 @@ https://pypi.org/project/trackinglog/
 
 0.1.8.4 Enhanced task manager with finish, inprogress, fail status; Add root folder path; Bug fix.
 
-0.1.8.4 Enhanced task manager with new resume task mechanism. Now new task == True (must be new task); None (new or resume); False (resume only).
+0.1.8.5 Enhanced task manager with new resume task mechanism. Now new task == True (must be new task); None (new or resume); False (resume only).
 
 ## Feature in developing
 
