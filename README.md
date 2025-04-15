@@ -45,6 +45,8 @@ https://pypi.org/project/trackinglog/
 
 0.1.8.5 Enhanced task manager with new resume task mechanism. Now new task == True (must be new task); None (new or resume); False (resume only).
 
+0.1.8.6 Now resume_task support True which would resume latest task. Bug fix.
+
 ## Feature in developing
 
 Add public and private log

@@ -136,14 +136,14 @@ class TaskMgtAgent:
         task_tkn = TaskToken(**status_dic)
         return task_tkn
 
-    def _clean_old_tasks(self, resume_task, new_task) -> None:
+    def _clean_old_tasks(self, resume_task: Union[bool, str], new_task: Optional[bool]) -> None:
         """Deletes folders older than expiration date and keeps only the latest task_num_limit folders."""
         
         # Get all folders in the task directory
         folders = [f for f in os.listdir(self._task_folder_path) if os.path.isdir(os.path.join(self._task_folder_path, f))]
-        if new_task == False:
+        if isinstance(resume_task, str) and new_task == False:
             assert resume_task in folders or resume_task.startswith("LATEST"), f"Can not find task {resume_task} in history"
-        if new_task == True:
+        if isinstance(resume_task, str) and new_task == True:
             assert resume_task not in folders and not resume_task.startswith("LATEST"), f"Task {resume_task} already exists"
 
         # Parse timestamps from folder names and filter valid folders
@@ -162,7 +162,7 @@ class TaskMgtAgent:
         if resume_task == "LATEST":
             resume_task = valid_folders[0][1]
             print(f"Resumed task {resume_task}")
-        else:
+        elif isinstance(resume_task, str):
             match = re.match(r'^LATEST_([A-Z][a-zA-Z]*)$', resume_task)
             if match:
                 _selected_status = match.group(1)
@@ -244,6 +244,8 @@ class TaskMgtAgent:
 
         assert isinstance(new_task, bool) or new_task is None, f"new_task must be True/False/None"
         assert resume_task != False or new_task != False, "'resume_task' and 'new_task' can not both be False"
+        if resume_task == True:
+            resume_task = "LATEST"
 
         self._task_folder_path = task_folder_path
         self._task_expiration_date = task_expiration_date
