@@ -79,6 +79,7 @@ class LogConfig:
         
         if isinstance(data, dict):
             root_log_path = data.get('root_log_path', default_log_path)
+            root_log_path = os.path.abspath(os.path.join(os.path.dirname(default_log_path), root_log_path)) if root_log_path.startswith(".") else os.path.abspath(root_log_path)
             cache_log_path = data.get('cache_log_path')
             cache_log_num_limit = data.get('cache_log_num_limit', 20)
             cache_log_day_limit = data.get('cache_log_day_limit', 7)
@@ -86,6 +87,7 @@ class LogConfig:
             # Assuming 'data' is an object with necessary attributes
             assert all(hasattr(data, attr) for attr in ["root_log_path", "cache_log_path", "cache_log_num_limit", "cache_log_day_limit"]), "Invalid data type for log config"
             root_log_path = getattr(data, "root_log_path", default_log_path) or default_log_path
+            root_log_path = os.path.abspath(os.path.join(os.path.dirname(default_log_path), root_log_path)) if root_log_path.startswith(".") else os.path.abspath(root_log_path)
             cache_log_path = getattr(data, "cache_log_path", None)
             cache_log_num_limit = getattr(data, "cache_log_num_limit", 20)
             cache_log_day_limit = getattr(data, "cache_log_day_limit", 7)
@@ -230,15 +232,15 @@ class ParameterConfig:
 
     @email_credential.setter
     def email_credential(self, value: Optional[Union[Callable, dict]]) -> None:
-        self._email_credential = EmailCredential(value, pjoin(self._task_folder_path, "emails"))
+        self._email_credential = EmailCredential(value, os.path.abspath(pjoin(self._task_folder_path, "emails")))
 
     @log_config.setter
     def log_config(self, value: Optional[Union[Callable, dict]]) -> None:
-        self._log_config = LogConfig(value, pjoin(self._task_config._curr_task_folder_path, "logs"))
+        self._log_config = LogConfig(value, os.path.abspath(pjoin(self._task_config._curr_task_folder_path, "logs")))
 
     @lock_config.setter
     def lock_config(self, value: Optional[Union[Callable, dict]]) -> None:
-        self._lock_config = LockConfig(value, pjoin(self._task_folder_path, "locks"))
+        self._lock_config = LockConfig(value, os.path.abspath(pjoin(self._task_folder_path, "locks")))
 
     @task_config.setter
     def task_config(self, value: Optional[Union[Callable, dict]]) -> None:

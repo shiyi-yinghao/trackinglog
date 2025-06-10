@@ -176,15 +176,27 @@ class LogManager:
                 log_kwargs["verbose"]=kwargs["verbose"]
             other_kwargs = {key: value for key, value in kwargs.items() if not key.startswith('_log_') and key!="verbose"}
             return log_kwargs, other_kwargs
-    
-        def print_and_log(log_method: Callable, default_verbose: bool = True) -> Callable:
-            @wraps(log_method)
+
+        LEVELS = {
+            "debug": logging.DEBUG,
+            "info": logging.INFO,
+            "warning": logging.WARNING,
+            "error": logging.ERROR,
+            "critical": logging.CRITICAL,
+        }
+        
+        def print_and_log(logger: logging.Logger, level_name: str, default_verbose: bool = True) -> Callable:
+            level = LEVELS[level_name]
             def wrapper(*args: Any, **kwargs: Any) -> Any:
                 log_kwargs, remaining_kwargs = split_kwargs(**kwargs)
                 system_msg=log_kwargs.get("system_msg", None)
                 func_name = inspect.stack()[1].function if system_msg is None else system_msg
+                _extra = remaining_kwargs.pop("extra", {})
+                _extra["caller_func_name"] = func_name
+
                 msg = LogManager.get_log_string(*args, **log_kwargs)
-                log_method(msg, extra={'caller_func_name': func_name}, **remaining_kwargs)
+                logger.log(level, msg, extra=_extra, **remaining_kwargs)
+
                 if log_kwargs.get("verbose", default_verbose):
                     print(msg)
                 if log_kwargs.get("notify", False):
@@ -195,8 +207,9 @@ class LogManager:
         # Decorate existing logger methods
         logging_methods = ['info', 'debug', 'warning', 'error', 'critical']
         for method in logging_methods:
-            setattr(logger, f'p{method}', print_and_log(getattr(logger, method), default_verbose=True))
-            setattr(logger, method, print_and_log(getattr(logger, method), default_verbose=False))
+            setattr(logger, f'p{method}', print_and_log(logger, method, default_verbose=True))
+            setattr(logger, method, print_and_log(logger, method, default_verbose=False))
+        
         
         
         # Placeholder for debugging msg rewrite after inherit merchanism

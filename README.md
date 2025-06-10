@@ -47,6 +47,8 @@ https://pypi.org/project/trackinglog/
 
 0.1.8.6 Now resume_task support True which would resume latest task. Bug fix.
 
+0.1.9 Optimize Log logic. Bug Fix. 
+
 ## Feature in developing
 
 Add public and private log
