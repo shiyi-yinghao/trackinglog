@@ -81,16 +81,16 @@ class LogConfig:
             root_log_path = data.get('root_log_path', default_log_path)
             root_log_path = os.path.abspath(os.path.join(os.path.dirname(default_log_path), root_log_path)) if root_log_path.startswith(".") else os.path.abspath(root_log_path)
             cache_log_path = data.get('cache_log_path')
-            cache_log_num_limit = data.get('cache_log_num_limit', 20)
-            cache_log_day_limit = data.get('cache_log_day_limit', 7)
+            cache_log_num_limit = data.get('cache_log_num_limit', 100)
+            cache_log_day_limit = data.get('cache_log_day_limit', 30)
         else:
             # Assuming 'data' is an object with necessary attributes
             assert all(hasattr(data, attr) for attr in ["root_log_path", "cache_log_path", "cache_log_num_limit", "cache_log_day_limit"]), "Invalid data type for log config"
             root_log_path = getattr(data, "root_log_path", default_log_path) or default_log_path
             root_log_path = os.path.abspath(os.path.join(os.path.dirname(default_log_path), root_log_path)) if root_log_path.startswith(".") else os.path.abspath(root_log_path)
             cache_log_path = getattr(data, "cache_log_path", None)
-            cache_log_num_limit = getattr(data, "cache_log_num_limit", 20)
-            cache_log_day_limit = getattr(data, "cache_log_day_limit", 7)
+            cache_log_num_limit = getattr(data, "cache_log_num_limit", 100)
+            cache_log_day_limit = getattr(data, "cache_log_day_limit", 30)
 
         # Adjust cache_log_path if it's not absolute
         cache_log_path = cache_log_path if cache_log_path and not cache_log_path.startswith(".") else os.path.abspath(pjoin(root_log_path, cache_log_path or "cache.log"))
@@ -101,7 +101,7 @@ class LogConfig:
         self._root_log_path = root_log_path
         self._cache_log_path = cache_log_path if cache_log_path is not None else pjoin(root_log_path, "cache")
         self._cache_log_num_limit = cache_log_num_limit if cache_log_num_limit is not None else 100
-        self._cache_log_day_limit = cache_log_day_limit if cache_log_day_limit is not None else 7
+        self._cache_log_day_limit = cache_log_day_limit if cache_log_day_limit is not None else 30
 
     @property
     def root_log_path(self) -> str:
@@ -181,11 +181,13 @@ class ParameterConfig:
         """
         Create a new ParameterConfig object with placholder values.
         """
-        self._root_folder_path = None
+        self._root_folder_path = pjoin(os.getcwd(), '.cache', "__trackinglog__")
+        self.task_name = "Default_Task"
+        self._task_config = None
         self._log_config = None
         self._email_credential = None
         self._lock_config = None
-
+        
     @property
     def root_folder_path(self) -> str:
         return self._root_folder_path
@@ -246,7 +248,7 @@ class ParameterConfig:
     def task_config(self, value: Optional[Union[Callable, dict]]) -> None:
         self._task_config = TaskMgtAgent(self._task_folder_path, value)
     
-    def setup(self, task_name: str ="Default_Task", root_folder_path: str = './', task_config: Optional[Union[Callable, dict]] = None, log_config: Optional[Union[Callable, dict]] = None, email_credential: Optional[Union[Callable, dict]] = None, lock_config: Optional[Union[Callable, dict]] = None) -> None:
+    def setup(self, task_name: str ="Default_Task", root_folder_path: str = './', task_config: Optional[Union[Callable, dict]] = {}, log_config: Optional[Union[Callable, dict]] = {}, email_credential: Optional[Union[Callable, dict]] = {}, lock_config: Optional[Union[Callable, dict]] = {}) -> None:
         """
         Setup the root logging path and initialize cache logging configuration.
         Parameters:
@@ -254,7 +256,8 @@ class ParameterConfig:
             cache_log_limit (int): The limit on the number of cache log files.
             cache_log_days (int): The number of days to keep cache log files.
         """
-        self.root_folder_path = root_folder_path
+        if root_folder_path is not None:
+            self.root_folder_path = root_folder_path
         self.task_name = task_name
         self.task_config = task_config
         self.log_config = log_config  if log_config is not None else {}

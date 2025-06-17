@@ -51,6 +51,8 @@ class LogManager:
             Callable: The wrapped function.
         """
         def decorator(self, *args, **kwargs):
+            if not hasattr(self, 'config') or self.config.log_config is None:
+                self.setup(root_folder_path=None)
             if not hasattr(self, 'config') or not self.config.log_config.root_log_path:
                 raise ValueError("Root log path must be set before using loggers.")
             return func(self, *args, **kwargs)

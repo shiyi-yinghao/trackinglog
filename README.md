@@ -49,6 +49,8 @@ https://pypi.org/project/trackinglog/
 
 0.1.9 Optimize Log logic. Bug Fix. 
 
+0.1.9.1 Set Default task name and root_folder_path. Allow usage without setup. Increase default task num limit to 500.
+
 ## Feature in developing
 
 Add public and private log
@@ -86,7 +88,7 @@ my_function()  # Running the function will log start and end, using the specific
 ```python
 
 trackinglog.logger.setup(task_name = "Tak1",
-                         root_folder_path='./tasks', 
+                         root_folder_path='./tasks',  # default ./cache/__trackinglog__
                          task_config={"task_num_limit":3, "task_expiration_date":3},
                          log_config={'root_log_path':"./logs", '_cache_log_path':"./logs/cache", 'cache_log_num_limit':10, '_cache_log_day_limit':7},
                          email_credential={'username':"PLACEHOLDER", 'password':"PLACEHOLDER",  'root_emails_folder':"./logs/emails"},

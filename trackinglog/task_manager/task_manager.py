@@ -107,7 +107,9 @@ class TaskMgtAgent:
         # Use getattr for compact initialization
         if isinstance(data, dict):
             task_expiration_date = data.get('task_expiration_date', None)
-            task_num_limit = data.get('task_num_limit', 10)
+            if data.get('task_num_limit') is None:
+                print("Warning! Default task limit is set to 500. Tasks exceeding this limit will be removed based on their creation time.")
+            task_num_limit = data.get('task_num_limit', 500)
             task_folder_format = data.get('task_folder_format', "%y%m%d_%H%M%S")
             resume_task = data.get('resume_task', False)
             new_task = data.get('new_task', None)
@@ -117,7 +119,9 @@ class TaskMgtAgent:
                    "Invalid data type for task config"
 
             task_expiration_date = getattr(data, "task_expiration_date", None)
-            task_num_limit = getattr(data, "task_num_limit", 10)
+            if data.get('task_num_limit') is None:
+                print("Warning! Default task limit is set to 500. Tasks exceeding this limit will be removed based on their creation time.")
+            task_num_limit = getattr(data, "task_num_limit", 500)
             task_folder_format = getattr(data, "task_folder_format", "%y%m%d_%H%M%S")
             resume_task = getattr(data, "resume_task", False)
             new_task = getattr(data, "new_task", None)
