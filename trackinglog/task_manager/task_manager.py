@@ -14,8 +14,9 @@ class TaskToken:
 
 class TaskFolderStruct:
     def __init__(self, task_folder_path):
+        self._task_folder_path = task_folder_path
         self._paths = {}  # Store paths in a private dictionary
-        folder_structure = {
+        self._folder_structure = {
             "root": "",
             "temp": "tmp",
             "cache": "tmp/cache",
@@ -23,40 +24,58 @@ class TaskFolderStruct:
             "result": "result",
             "__config": ".__config"
         }
+        self.__config_tkn_path = None
 
-        for attr, relpath in folder_structure.items():
-            fd_path = os.path.abspath(pjoin(task_folder_path, relpath))
+    def _ensure_folder_exists(self, folder_key):
+        """Lazily create folder and cache its path when first accessed."""
+        if folder_key not in self._paths:
+            relpath = self._folder_structure[folder_key]
+            fd_path = os.path.abspath(pjoin(self._task_folder_path, relpath))
             os.makedirs(fd_path, exist_ok=True)
-            self._paths[attr] = fd_path
+            self._paths[folder_key] = fd_path
         
-        self.__config_tkn_path=pjoin(self._paths["__config"], ".trackinglog.tkn")
+        # Always ensure config folder exists when any folder is accessed
+        self._ensure_config_folder()
+        
+        return self._paths[folder_key]
+    
+    def _ensure_config_folder(self):
+        """Ensure config folder and token file exist since package relies on it."""
+        if "__config" not in self._paths:
+            config_relpath = self._folder_structure["__config"]
+            config_fd_path = os.path.abspath(pjoin(self._task_folder_path, config_relpath))
+            os.makedirs(config_fd_path, exist_ok=True)
+            self._paths["__config"] = config_fd_path
+            
+            # Initialize config token file
+            self.__config_tkn_path = pjoin(config_fd_path, ".trackinglog.tkn")
+            if not os.path.exists(self.__config_tkn_path):
+                with open(self.__config_tkn_path, "w") as f:
+                    json.dump({"sys_status": "INIT"}, f)
 
-        if not os.path.exists(self.__config_tkn_path):
-            with open(self.__config_tkn_path, "w") as f:
-                json.dump({"sys_status": "INIT"}, f)
-
-    # Property methods to provide read-only access
+    # Property methods to provide read-only access with lazy initialization
     @property
     def root(self):
-        return self._paths["root"]
+        return self._ensure_folder_exists("root")
     
     @property
     def temp(self):
-        return self._paths["temp"]
+        return self._ensure_folder_exists("temp")
 
     @property
     def cache(self):
-        return self._paths["cache"]
+        return self._ensure_folder_exists("cache")
 
     @property
     def var(self):
-        return self._paths["var"]
+        return self._ensure_folder_exists("var")
 
     @property
     def result(self):
-        return self._paths["result"]
+        return self._ensure_folder_exists("result")
     
     def finish(self, params: Optional[Any] = None):
+        self._ensure_config_folder()
         with open(self.__config_tkn_path, "w") as f:
             json.dump({
                         "sys_status": "FINISH",
@@ -64,6 +83,7 @@ class TaskFolderStruct:
                        }, f)
             
     def inprogress(self, params: Optional[Any] = None):
+        self._ensure_config_folder()
         with open(self.__config_tkn_path, "w") as f:
             json.dump({
                         "sys_status": "INPROGRESS",
@@ -71,6 +91,7 @@ class TaskFolderStruct:
                        }, f)
     
     def fail(self, params: Optional[Any] = None):
+        self._ensure_config_folder()
         with open(self.__config_tkn_path, "w") as f:
             json.dump({
                         "sys_status": "FAIL",
@@ -78,12 +99,14 @@ class TaskFolderStruct:
                        }, f)
     @property
     def status(self):
+        self._ensure_config_folder()
         with open(self.__config_tkn_path, "r") as f:
             status_dic = json.load(f)
         return status_dic["sys_status"]
     
     @property
     def config(self):
+        self._ensure_config_folder()
         with open(self.__config_tkn_path, "r") as f:
             status_dic = json.load(f)
         return status_dic.get("user_config", {})
@@ -107,9 +130,7 @@ class TaskMgtAgent:
         # Use getattr for compact initialization
         if isinstance(data, dict):
             task_expiration_date = data.get('task_expiration_date', None)
-            if data.get('task_num_limit') is None:
-                print("Warning! Default task limit is set to 500. Tasks exceeding this limit will be removed based on their creation time.")
-            task_num_limit = data.get('task_num_limit', 500)
+            task_num_limit = data.get('task_num_limit')
             task_folder_format = data.get('task_folder_format', "%y%m%d_%H%M%S")
             resume_task = data.get('resume_task', False)
             new_task = data.get('new_task', None)
@@ -119,9 +140,7 @@ class TaskMgtAgent:
                    "Invalid data type for task config"
 
             task_expiration_date = getattr(data, "task_expiration_date", None)
-            if data.get('task_num_limit') is None:
-                print("Warning! Default task limit is set to 500. Tasks exceeding this limit will be removed based on their creation time.")
-            task_num_limit = getattr(data, "task_num_limit", 500)
+            task_num_limit = getattr(data, "task_num_limit")
             task_folder_format = getattr(data, "task_folder_format", "%y%m%d_%H%M%S")
             resume_task = getattr(data, "resume_task", False)
             new_task = getattr(data, "new_task", None)
@@ -150,6 +169,17 @@ class TaskMgtAgent:
         if isinstance(resume_task, str) and new_task == True:
             assert resume_task not in folders and not resume_task.startswith("LATEST"), f"Task {resume_task} already exists"
 
+        # Show warning only when folder count < 2 for safety
+        folder_count = len(folders)
+        if folder_count < 2 and self._task_num_limit is None and self._task_expiration_date is None :
+            print("Warning! Both task num limit and task expiration date is not set. Please setup the one of them for cleaner task tracking.")
+
+
+        # Check if we need to run cleanup based on 80% threshold
+        threshold_80_percent = int(self._task_num_limit * 0.8) if self._task_num_limit else folder_count + 10
+        if folder_count > threshold_80_percent:
+            print("Info[trackinglog]: current task num is approachiing the task num limit [80%], will begin historical task cleaning soon.")
+
         # Parse timestamps from folder names and filter valid folders
         valid_folders = []
         for folder in folders:
@@ -177,7 +207,7 @@ class TaskMgtAgent:
                         break
                 assert not resume_task.startswith("LATEST"), f"Can no find any task with status {_selected_status}"
                 print(f"Resumed task {resume_task}")
-
+            
         # Step 1: **Keep only the latest `task_num_limit` folders, delete the rest**
         if self._task_num_limit is not None:
             folders_to_delete = valid_folders[self._task_num_limit:]
@@ -213,15 +243,6 @@ class TaskMgtAgent:
         os.makedirs(_root_task_fd_path, exist_ok=True)
 
         return resume_task
-    
-        # if resume_task:
-        #     return resume_task  # Resume existing task
-        # else:
-        #     # Create a new task folder with the current timestamp
-        #     new_task_name = new_task if new_task is not None else datetime.now().strftime(self._task_folder_format)
-        #     os.makedirs(pjoin(self._task_folder_path, new_task_name), exist_ok=True)
-        #     print(f"Created new task folder: {new_task_name}")
-        #     return new_task_name  # Return new task folder name
 
     def _extract_date_from_folder(self, folder_name: str) -> Optional[datetime]:
         """Extracts the date from folder name using the task_folder_format."""

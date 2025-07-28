@@ -175,7 +175,7 @@ class LockConfig:
     
 
 class ParameterConfig:
-    __slots__ = ['_root_folder_path', '_task_name', '_task_folder_path', '_log_config', '_email_credential', '_lock_config', '_task_config']
+    __slots__ = ['_root_folder_path', '_task_name', '_task_folder_path', '_log_config', '_email_credential', '_lock_config', '_task_config', '_is_configured']
 
     def __init__(self) -> None:
         """
@@ -187,6 +187,7 @@ class ParameterConfig:
         self._log_config = None
         self._email_credential = None
         self._lock_config = None
+        self._is_configured = False
         
     @property
     def root_folder_path(self) -> str:
@@ -256,6 +257,10 @@ class ParameterConfig:
             cache_log_limit (int): The limit on the number of cache log files.
             cache_log_days (int): The number of days to keep cache log files.
         """
+        # Check if already configured
+        if self._is_configured:
+            raise RuntimeError("ParameterConfig has already been configured. Multiple setup calls are not allowed.")
+        
         if root_folder_path is not None:
             self.root_folder_path = root_folder_path
         self.task_name = task_name
@@ -263,6 +268,9 @@ class ParameterConfig:
         self.log_config = log_config  if log_config is not None else {}
         self.email_credential = email_credential if email_credential is not None else {}
         self.lock_config = lock_config if lock_config is not None else {}
+        
+        # Mark as configured
+        self._is_configured = True
         
 
 

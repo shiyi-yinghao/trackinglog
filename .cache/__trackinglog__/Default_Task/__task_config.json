@@ -1,0 +1,5 @@
+{
+    "task_expiration_date": null,
+    "task_num_limit": null,
+    "task_folder_format": "%y%m%d_%H%M%S"
+}

@@ -57,3 +57,5 @@ __pycache__/
 *.bak
 *.tmp
 *.swp
+
+CLAUDE.md

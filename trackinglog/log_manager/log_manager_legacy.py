@@ -211,6 +211,8 @@ class LogManager:
             setattr(logger, f'p{method}', print_and_log(logger, method, default_verbose=True))
             setattr(logger, method, print_and_log(logger, method, default_verbose=False))
         
+        
+        
         # Placeholder for debugging msg rewrite after inherit merchanism
         # logger._debugging_msg_dict = ddict(list)
         logger._debugging_msg = []
@@ -256,11 +258,10 @@ class LogManager:
         except Exception:
             pass
 
-    # ===== NEW LAZY DESIGN - 4 FUNCTIONS =====
-    
+   
     def get_log(self, logname: str, filename: Optional[str] = None, folderpath: Optional[str] = None, log_level: int = logging.DEBUG, verbose: int = 0, enable_profiling: Optional[str] = "function", print2log: bool = False) -> Callable:
         """
-        Returns a lazy decorator (either for class or function) without executing any setup.
+        Get a logger configured for function profiling, error handling, and optional output capture.
         Parameters:
             logname (str): Name of the logger.
             filename (str, optional): Filename for log output.
@@ -270,50 +271,9 @@ class LogManager:
             enable_profiling (str): Profiling type ("function", "line", or None).
             print2log (bool): If True, print outputs are captured and logged.
         Returns:
-            Callable: A lazy decorator that will be applied to functions or classes.
+            Callable: A decorator to apply logging and profiling to functions or methods.
         """
-        # Store parameters but don't execute anything yet
-        params = {
-            'logname': logname,
-            'filename': filename,
-            'folderpath': folderpath,
-            'log_level': log_level,
-            'verbose': verbose,
-            'enable_profiling': enable_profiling,
-            'print2log': print2log
-        }
-        
-        def lazy_dispatcher(obj: Any) -> Callable:
-            """Dispatches to appropriate lazy decorator based on object type"""
-            if isinstance(obj, type):
-                return self._lazy_class_decorator(obj, params)
-            else:
-                return self._lazy_function_decorator(obj, params)
-        
-        return lazy_dispatcher
-
-    def _create_logger_decorator(self, params: dict) -> Tuple[logging.Logger, Callable, Callable, Callable]:
-        """
-        Contains all the current get_log logic and helper functions.
-        This is called by lazy decorators when actual logger is needed.
-        Parameters:
-            params (dict): Parameters passed from get_log
-        Returns:
-            Tuple: (logger, trace_error_msg, manage_profiling)
-        """
-        # Setup check
-        if not hasattr(self, 'config') or self.config.log_config is None:
-            self.setup(root_folder_path=None)
-        if not hasattr(self, 'config') or not self.config.log_config.root_log_path:
-            raise ValueError("Root log path must be set before using loggers.")
-        
-        # Create logger
-        logger = self.get_logger(
-            params['logname'], 
-            filename=params['filename'], 
-            folderpath=params['folderpath'], 
-            log_level=params['log_level']
-        )
+        logger = self.get_logger(logname, filename=filename, folderpath=folderpath, log_level=log_level)
 
         def trace_error_msg() -> str:
             """
@@ -364,7 +324,7 @@ class LogManager:
                 with CapturePrints() as captured:
                     result = func(*args, **kwargs)
                     captured_print = captured.getvalue()
-                    logger.pinfo(captured_print, verbose=params['verbose'], _log_system_msg=func.__name__)
+                    logger.pinfo(captured_print, verbose=verbose, _log_system_msg=func.__name__)
             else:
                 result = func(*args, **kwargs)
 
@@ -384,125 +344,83 @@ class LogManager:
                 logger.info(f"Resource usage: CPU {cpu_after - cpu_before}%, Memory {((memory_after - memory_before) / (1024 * 1024)):.2f} MB", _log_system_msg="<LOG_MANAGER>")
             return result
 
-        return logger, trace_error_msg, manage_profiling
+        @singledispatch
+        def decorator(obj: Any) -> Callable:
+            raise NotImplementedError("Unsupported type")
 
-    def _lazy_function_decorator(self, func: Callable, params: dict) -> Callable:
-        """
-        Lazy decorator for functions that calls _create_logger_decorator when function is first called.
-        Parameters:
-            func (Callable): The function to be decorated.
-            params (dict): Parameters from get_log.
-        Returns:
-            Callable: The decorated function.
-        """
-        # Flag to track if decorator has been executed
-        _decorator_executed = False
-        _logger = None
-        _trace_error_msg = None
-        _manage_profiling = None
-        
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            nonlocal _decorator_executed, _logger, _trace_error_msg, _manage_profiling
-            
-            # Execute decorator logic on first call
-            if not _decorator_executed:
-                _logger, _trace_error_msg, _manage_profiling = self._create_logger_decorator(params)
-                _decorator_executed = True
-            
-            # Function execution logic (original function decorator logic)
-            if params['verbose']:
-                _logger.debug(f'Function ** {func.__name__} ** Called', _log_system_msg="<LOG_MANAGER>")
-            try:
-                kwargs.pop('log', None)
-                kwargs['log'] = _logger
-                _result = _manage_profiling(func, args, kwargs, profiling_type=params['enable_profiling'], print2log=params['print2log'])
-                if params['verbose']:
-                    _logger.debug(f'Function ** {func.__name__} ** Returned.', _log_system_msg="<LOG_MANAGER>")
-                return _result
-            except Exception as e:
-                _logger.error(f"Uncatched Error: {e}", _log_system_msg="<LOG_MANAGER>")
-                _logger.error(_trace_error_msg(), _log_system_msg="<LOG_MANAGER>")
-                if _logger._debugging_msg:
-                    _logger.perror("------\nError Handling Suggestions: \n" + ";\n".join(_logger._debugging_msg), _log_system_msg="<LOG_MANAGER>")
-                raise
-        
-        return wrapper
+        @decorator.register
+        def _(cls: type) -> type:
+            original_init = cls.__init__
 
-    def _lazy_class_decorator(self, cls: type, params: dict) -> type:
-        """
-        Lazy decorator for classes that calls _create_logger_decorator when class is first instantiated.
-        Parameters:
-            cls (type): The class to be decorated.
-            params (dict): Parameters from get_log.
-        Returns:
-            type: The decorated class.
-        """
-        original_init = cls.__init__
-        
-        # Flag to track if decorator has been executed
-        _decorator_executed = False
-        _logger = None
-        _trace_error_msg = None
-        _manage_profiling = None
-
-        @wraps(cls.__init__)
-        def wrapped_init(self, *args: Any, **kwargs: Any) -> None:
-            nonlocal _decorator_executed, _logger, _trace_error_msg, _manage_profiling
+            @wraps(cls.__init__)
+            def wrapped_init(self, *args: Any, **kwargs: Any) -> None:
+                original_init(self, *args, **kwargs)
+                self.log = logger
             
-            # Execute decorator logic on first instantiation
-            if not _decorator_executed:
-                _logger, _trace_error_msg, _manage_profiling = cls._create_logger_decorator_instance(params)
-                print("wrapped_init: ", _logger)
-                _decorator_executed = True
-            else:
-                print("wrapped_init: ", _decorator_executed)
-            
-            profile_all_methods(cls, params['enable_profiling'], params['print2log'])
-            original_init(self, *args, **kwargs)
-            self.log = _logger
-        
-        # Store reference to LogManager instance for lazy execution
-        cls._create_logger_decorator_instance = lambda params: self._create_logger_decorator(params)
-        
-        update_wrapper(wrapped_init, original_init)
-        cls.__init__ = wrapped_init
+            update_wrapper(wrapped_init, original_init)
+            cls.__init__ = wrapped_init
 
-        def attribute_profile_decorator(func: Callable, profiling_type: Optional[str], print2log: bool) -> Callable:
-            """Decorator that adds log method calls and adds profiling to functions."""
+
+            def attribute_profile_decorator(func: Callable, profiling_type: Optional[str], print2log: bool) -> Callable:
+                """Decorator that adds log method calls and adds profiling to functions."""
+                @wraps(func)
+                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    if verbose:
+                        logger.debug(f"** {cls.__name__}.{func.__name__} ** Called", _log_system_msg="<LOG_MANAGER>")
+
+                    try:
+                        _result = manage_profiling(func, args, kwargs, profiling_type=profiling_type, print2log=print2log)
+                    except Exception as e:
+                        logger.error(f"Uncatched Error: {e}", _log_system_msg="<LOG_MANAGER>")
+                        logger.error(trace_error_msg(), _log_system_msg="<LOG_MANAGER>")
+                        if logger._debugging_msg:
+                            logger.perror("------\nError Handling Suggestions: \n" + ";\n".join(logger._debugging_msg), _log_system_msg="<LOG_MANAGER>")
+                        if profiling_type == "line":
+                            try:
+                                profiler.disable()
+                                del profiler
+                            except:
+                                pass
+                        raise
+
+                    if verbose:
+                            logger.debug(f"** {cls.__name__}.{func.__name__} ** Returned", _log_system_msg="<LOG_MANAGER>")
+    
+                    return _result
+                return wrapper
+
+            def profile_all_methods(cls: type, profiling_type: Optional[str], print2log: bool) -> None:
+                """Class decorator that applies the `attr_profiler_decorator` decorator to all callable methods of a class."""
+                for attr_name in dir(cls):
+                    attr = getattr(cls, attr_name)
+                    if callable(attr) and not attr_name.startswith("__"):
+                        setattr(cls, attr_name, attribute_profile_decorator(attr, profiling_type, print2log))
+
+            profile_all_methods(cls, enable_profiling, print2log)
+
+            return cls
+
+        @decorator.register(types.FunctionType)
+        def _(func: Callable) -> Callable:
             @wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                if params['verbose']:
-                    _logger.debug(f"** {cls.__name__}.{func.__name__} ** Called", _log_system_msg="<LOG_MANAGER>")
-
+                if verbose:
+                    logger.debug(f'Function ** {func.__name__} ** Called', _log_system_msg="<LOG_MANAGER>")
                 try:
-                    _result = _manage_profiling(func, args, kwargs, profiling_type=profiling_type, print2log=print2log)
+                    kwargs.pop('log', None)
+                    kwargs['log'] = logger
+                    _result = manage_profiling(func, args, kwargs, profiling_type=enable_profiling, print2log=print2log)
+                    if verbose:
+                        logger.debug(f'Function ** {func.__name__} ** Returned.', _log_system_msg="<LOG_MANAGER>")
+                    return _result
                 except Exception as e:
-                    _logger.error(f"Uncatched Error: {e}", _log_system_msg="<LOG_MANAGER>")
-                    _logger.error(_trace_error_msg(), _log_system_msg="<LOG_MANAGER>")
-                    if _logger._debugging_msg:
-                        _logger.perror("------\nError Handling Suggestions: \n" + ";\n".join(_logger._debugging_msg), _log_system_msg="<LOG_MANAGER>")
-                    if profiling_type == "line":
-                        try:
-                            profiler.disable()
-                            del profiler
-                        except:
-                            pass
+                    logger.error(f"Uncatched Error: {e}", _log_system_msg="<LOG_MANAGER>")
+                    logger.error(trace_error_msg(), _log_system_msg="<LOG_MANAGER>")
+                    if logger._debugging_msg:
+                            logger.perror("------\nError Handling Suggestions: \n" + ";\n".join(logger._debugging_msg), _log_system_msg="<LOG_MANAGER>")
                     raise
-
-                if params['verbose']:
-                        _logger.debug(f"** {cls.__name__}.{func.__name__} ** Returned", _log_system_msg="<LOG_MANAGER>")
-
-                return _result
             return wrapper
-
-        def profile_all_methods(cls: type, profiling_type: Optional[str], print2log: bool) -> None:
-            """Class decorator that applies the `attr_profiler_decorator` decorator to all callable methods of a class."""
-            for attr_name in dir(cls):
-                attr = getattr(cls, attr_name)
-                if callable(attr) and not attr_name.startswith("__"):
-                    setattr(cls, attr_name, attribute_profile_decorator(attr, profiling_type, print2log))
-
-        return cls
+        
+        return decorator
     
     setup_check=staticmethod(setup_check)
