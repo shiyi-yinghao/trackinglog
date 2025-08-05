@@ -453,10 +453,7 @@ class LogManager:
             # Execute decorator logic on first instantiation
             if not _decorator_executed:
                 _logger, _trace_error_msg, _manage_profiling = cls._create_logger_decorator_instance(params)
-                print("wrapped_init: ", _logger)
                 _decorator_executed = True
-            else:
-                print("wrapped_init: ", _decorator_executed)
             
             profile_all_methods(cls, params['enable_profiling'], params['print2log'])
             original_init(self, *args, **kwargs)
